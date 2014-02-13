@@ -41,7 +41,7 @@ jQuery(document).ready(function() {
 
 		streetViewControl: false,
 
-		mapTypeControl: true
+		mapTypeControl: false
 
 	});
 
@@ -178,7 +178,7 @@ marker.setMap(map);
 	
 		
 	var myTrip = [coordsS,coordsF];
-	alert(myTrip);
+	
 var flightPath = new google.maps.Polyline({
   path:myTrip,
   strokeColor:"#0000FF",
