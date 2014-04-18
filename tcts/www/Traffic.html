@@ -1,0 +1,240 @@
+﻿
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
+    <meta charset="utf-8">
+    <title>Draggable directions</title>
+<style>
+      html, body, #map-canvas {
+        height: 100%;
+        margin: 0px;
+        padding: 0px
+      }
+      #panel {
+        position: absolute;
+        top: 5px;
+        left: 50%;
+        margin-left: -180px;
+        z-index: 5;
+        background-color: #fff;
+        padding: 5px;
+        border: 1px solid #999;
+      }
+    </style>
+    <script src="https://maps.googleapis.com/maps/api/js?v=3.exp&sensor=false&libraries=geometry"></script>
+      <script src="js/jquery-1.9.1.js" type="text/javascript"></script>
+<script>
+        var map;
+        var directionsDisplay;
+        var directionsService;
+        var stepDisplay;
+        var markerArray = [];
+        var lines = [];
+        var routes = [];
+        var routesDistance = [];
+        var routesAvgSpeed = [];
+        var routesAvgSpeedCount = [];
+        var routesVehiclesCount = [];
+        var routesDistancePerPatch = [];
+        var routesTimePerPatch = [];
+
+        var lastColor;
+        var xmlStr;
+
+        
+        function getData(time) {
+            $.ajax({
+                type: "POST",
+                url: "Server/FetchTraffic.php",
+                data: { time: time, xmlStr: xmlStr }
+            }).success(function (result) {
+                displayLines(result);
+            });
+        }
+        function displayLines(json) {
+            var obj = JSON.parse(json);
+            removeLines();
+            removeMarkers();
+            var i = 0;
+            displayMarker(obj[0].spLat, obj[0].spLon);
+            for (var property in obj) {
+                if (obj.hasOwnProperty(property)) {
+                    var o = obj[property];
+                    if (o.pointIndex == 1) { routesAvgSpeed[o.routeId] = 0; routesAvgSpeedCount[o.routeId] = 0; routesVehiclesCount[o.routeId] = 0; lastColor = "yellow";
+                        routesDistancePerPatch[o.routeId] = 0; routesTimePerPatch[o.routeId] = 0;}
+                    routesAvgSpeed[o.routeId] += o.avgSpeed;
+                    routesAvgSpeedCount[o.routeId] += o.avgSpeed > 0 ? 1 : 0;
+                    routesVehiclesCount[o.routeId] += o.noOfVehicles;
+                    routes[i] = o.routeId;
+                    ///////////////////////////////////////
+                    var coordinates = [new google.maps.LatLng(o.spLat, o.spLon), new google.maps.LatLng(o.epLat, o.epLon)];
+                    routesDistancePerPatch[o.routeId] += calcDistance(coordinates[0], coordinates[1]);
+                    routesTimePerPatch[o.routeId] += (calcDistance(coordinates[0], coordinates[1]) / 1000) / (o.avgSpeed > 0 ? o.avgSpeed : 30);
+                    ///////////////////////////////////////
+                    lastColor = getColor(o.avgSpeed);
+                    lines[i] = new google.maps.Polyline({
+                        path: coordinates,
+                        geodesic: true,
+                        map: map,
+                        strokeColor: lastColor,
+                        strokeOpacity: 1.0,
+                        strokeWeight: 5
+                    });
+                    i++
+                }
+            }
+            displayMarker(obj[(i - 1)].spLat, obj[(i - 1)].spLon);
+            SetInfoWindows();
+        }
+        function getColor(speed) {
+            if (speed <= 0) {
+                return lastColor;
+            }
+            else if (speed <= 10) {
+                return "red";
+            } else if (speed <= 20) {
+                return "blue";
+            } else if (speed <= 40) {
+                return "yellow";
+            } else {
+                return "green";
+            }
+        }
+        function removeLines() {
+            for (var i = 0; i < lines.length; i++) {
+                lines[i].setMap(null);
+            }
+
+            lines = [];
+        }
+        function removeMarkers() {
+            for (var i = 0; i < markerArray.length; i++) {
+                markerArray[i].setMap(null);
+            }
+            markerArray = [];
+        }
+        function displayMarker(lat, lng) {
+            var marker = new google.maps.Marker({
+                                position: new google.maps.LatLng(lat, lng),
+                                map: map
+            });
+            markerArray[markerArray.length] = marker;
+        }
+        
+        function initialize() {
+            receiveData();
+            directionsService = new google.maps.DirectionsService();
+
+            var karachi = new google.maps.LatLng(24.9201551, 67.094978999999970000);
+            var mapOptions = {
+                zoom: 13,
+                center: karachi
+            }
+            map = new google.maps.Map(document.getElementById('map-canvas'), mapOptions);
+
+            directionsDisplay = [];
+            
+            stepDisplay = new google.maps.InfoWindow();
+            calcRoute();
+            
+        }
+
+        function calcRoute() {
+
+            //var start = document.getElementById('start').value;
+            //var end = document.getElementById('end').value;
+            //var request = {
+            //    origin: start=="point"?new google.maps.LatLng(24.9557, 67.0779):start,
+            //    destination: end=="point"?new google.maps.LatLng(24.8922, 67.1218):end,
+            //    travelMode: google.maps.TravelMode.DRIVING,
+            //    provideRouteAlternatives: true
+            //};
+            //directionsService.route(request, function (response, status) {
+            //    if (status == google.maps.DirectionsStatus.OK) {
+            //        //getSteps(response);
+                    
+            //    }
+                
+            //});
+            getData($('#time').val());
+        }
+
+        //function getSteps(directionResult) {
+        //    var routes = directionResult.routes;
+        //    var str = '<routes>';
+        //    for (var i = 0, len = routes.length; i < len; i++) {
+        //        routesDistance[i] = routes[i].legs[0].distance.value;
+        //        str += '<route id="' + i + '"><overview_path>'
+        //        str += '<point lat="' + routes[i].legs[0].start_location.k + '" lon="' + routes[i].legs[0].start_location.A + '" />';
+        //        for (var j = 0, lenj = routes[i].overview_path.length; j < lenj; j++) {
+        //            str += '<point lat="' + routes[i].overview_path[j].k + '" lon="' + routes[i].overview_path[j].A + '" />';
+        //        }
+        //        str += '<point lat="' + routes[i].legs[0].end_location.k + '" lon="' + routes[i].legs[0].end_location.A + '" />';
+        //        str += '</overview_path></route>';
+        //    }
+        //    str += '</routes>';
+        //    getData($('#time').val(), str);
+        //}
+
+        //function receiveMessage(event) {
+        //    //if (event.origin !== "Selection.html")
+        //    //    return;
+        //    xmlStr = event.data;
+        //    //routesDistance = event.data.routesDistance;
+        //}
+        function SetInfoWindows() {
+            var displayText ;
+            for (var i = 0, len = routes.length; i < len; i++) {
+                //displayText = "Total Distance: " + (routesDistance[routes[i]] / 1000).toFixed(2) + " km<br/>";
+                //displayText += "Total Average Speed: " + (routesAvgSpeed[routes[i]] / routesAvgSpeedCount[routes[i]]).toFixed(2) + " km/h<br/>";
+                //displayText += "Estimated Time: " + ((routesDistance[routes[i]] / 1000) / (routesAvgSpeed[routes[i]] / routesAvgSpeedCount[routes[i]])).toFixed(2) + " hour(s)<br/>";
+                //displayText += "No. Of Vehicles: " + routesVehiclesCount[routes[i]] + "";
+                displayText = "Total Distance: " + (routesDistancePerPatch[routes[i]] / 1000).toFixed(2) + " km<br/>";
+                displayText += "Total Average Speed: " + (routesAvgSpeed[routes[i]] / routesAvgSpeedCount[routes[i]]).toFixed(2) + " km/h<br/>";
+                displayText += "Estimated Time: " + (routesTimePerPatch[routes[i]]).toFixed(2) + " hour(s)<br/>";
+                displayText += "No. Of Vehicles: " + routesVehiclesCount[routes[i]] + "";
+                attachInstructionText(lines[i], displayText);
+            }
+        }
+
+        function attachInstructionText(line, text) {
+            google.maps.event.addListener(line, 'click', function (event) {
+                stepDisplay.setContent(text);
+                stepDisplay.setPosition(event.latLng);
+                stepDisplay.open(map);
+                
+            });
+        }
+        function receiveData() {
+            var obj = JSON.parse(localStorage['obj']);
+            xmlStr = obj.xmlStr;
+        }
+        function calcDistance(p1, p2){
+            return (google.maps.geometry.spherical.computeDistanceBetween(p1, p2));
+        }
+
+        google.maps.event.addDomListener(window, 'load', initialize);
+    </script>
+  </head>
+<body >
+    <div id="panel">
+        <input type="time" id="time" value="16:00" onchange="calcRoute();" /><br />
+        <b>Speed Chart (km/h): </b><span>
+            <img src="images/red.png" />
+            1 - 10 </span>&nbsp&nbsp
+        <span>
+            <img src="images/blue.png" />
+            10 - 20 </span>&nbsp&nbsp
+        <span>
+            <img src="images/yellow.png" />
+            20 - 40 </span>&nbsp&nbsp
+        <span>
+            <img src="images/green.png" />
+            Greater Than 40 </span>&nbsp&nbsp
+    </div>
+    <div id="map-canvas"></div>
+    &nbsp;
+    <div id="warnings_panel" style="width: 100%; height: 10%; text-align: center"></div>
+</body>
+</html>

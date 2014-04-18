@@ -18,32 +18,43 @@
       <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>-->
         <script src="js/jquery-1.9.1.js" type="text/javascript"></script>
         <script type="text/javascript">
-            function Login() {
+            function Register() {
                 var un = $('#userName').val();
                 var pass = $('#password').val();
+                var email = $('#email').val();
+                var cnfPass = $('#cnfPassword').val();
                 $.ajax({
                     type: "POST",
-                    url: "Server/Login.php",
-                    data: { UserName: un, Password: pass }
+                    url: "Server/Register.php",
+                    data: { UserName: un, Email: email, Password: pass }
                 }).success(function (result) {
-                    if (result == 'True') { localStorage['userName'] = un; window.location = "Search.html"}
-                    else { alert('Login Failed!'); }
+                    if (result == 1) { alert('Registered Successfully!'); window.location = 'Index.html';}
+                    else if (result == 0) { alert('Registration Failed. UserName Already Exists.'); $('#userName').focus(); }
+                    else { alert('Registration Failed!'); }
+                });
+            }
+            function submitHandler() {
+                //alert('test');
+                $('#registrationForm').submit(function (event) {
+                    event.preventDefault();
+                    Register();
                 });
             }
         </script>
   </head>
 
-  <body>
+  <body onload="submitHandler()">
 
     <div class="container">
 
-      <form class="form-signin" role="form">
-        <h2 class="form-signin-heading">Please sign in</h2>
+      <form class="form-signin" role="form" id="registrationForm" >
+        <h2 class="form-signin-heading">Register</h2>
         <input type="text" id="userName" class="form-control" placeholder="User Name" required="" autofocus="">
+        <input type="email" id="email" class="form-control" placeholder="Email Address" required="">
         <input type="password" id="password" class="form-control" placeholder="Password" required="">
+        <input type="password" id="cnfPassword" class="form-control" placeholder="Confirm Password" required="">
 
-        <button class="btn btn-lg btn-primary btn-block" type="button" onclick="Login();">Sign in</button>
-        <button class="btn btn-lg btn-primary btn-block" type="button" onclick="window.location= 'Register.html';">Register</button>
+        <button class="btn btn-lg btn-primary btn-block" type="submit" >Register</button>
       </form>
 
     </div>  
